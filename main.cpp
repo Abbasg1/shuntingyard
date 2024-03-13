@@ -36,16 +36,17 @@ public:
   Stack();
   ~Stack();
   int push(const char&);
-  int pop(char& item);
+  int pop(char&);
   int peek(char&);
   int isEmpty();
   int isFull();
-  int print();
+  //int print();
+  int top;
 
 private:
   static const int SIZE = 100;
   char* arr;
-  int top;
+  
 };
 //stack class according to lecture
 class Queue
@@ -68,8 +69,8 @@ private:
 //fxn prototypes
 bool isOp(char c); //check if char is operator
 int getPrecedence(char c);//get an operators precedence
-void InfixtoPostfix(const char* in, char* post);//convert infix expression to postfix
-Node* createExpTree(const char* post);
+void InfixtoPostfix(const char* in, char* post, Stack& s, Queue& q);//convert infix expression to postfix
+Node* createExpTree(Queue& q);
 void traverseInorder(Node* r); //travers tree inorder, passes in the root ptr
 void traversePreorder(Node* r);
 void traversePostorder(Node* r);
@@ -77,16 +78,19 @@ void traversePostorder(Node* r);
 
 
 int main()
-{//prompts, drver code
+{//prompts, drver code, output
   char infix[100];
   char postfix[100];
-  cout << "Enter infix expresion: ";
+  cout << "Enter infix expression: ";
   cin.getline(infix, 100);
 
-  InfixtoPostfix(infix, postfix);
+  Stack stack;
+  Queue queue;
+  
+  InfixtoPostfix(infix, postfix, stack, queue);
   cout << "Postfix expression: " << postfix << endl;
 
-  Node* root = createExpTree(postfix);
+  Node* root = createExpTree(queue);
   cout << "Infix expression: ";
   traverseInorder(root);
   cout << endl;
@@ -114,7 +118,7 @@ Stack::~Stack()
 }
 
 
-//push and pop, explained by lecture and a different video
+//push and pop, explained by lecture and a different video.   error handlign??
 int Stack::push(const char& item)
 {
   if(isFull())
@@ -130,10 +134,8 @@ int Stack::pop(char& item)
   if(isEmpty())
   {
     return -1;
-    
-    item = arr[top--];
-    return 0;
   }
+  return arr[top--];
 }
 int Stack::peek(char& item)
 {
@@ -154,20 +156,20 @@ int Stack::isFull()
 {
   return top == SIZE-1;
 }
-
+/*
 int Stack::print()
 {
   if(isEmpty())
-    {
-      cout << "empty stack" << endl;
-      return -1;
-    }
-  for(int x = top; x >= 0; x--)
-    {
-      cout << arr[x] << " " << endl;
-    }
+  {
+    cout << "empty stack" << endl;
+    return -1;
+  }
+  for(int x = top; x >= 0; --x)
+  {
+   cout << arr[x] << " ";
+  }
   return 0;
-}
+}*/
 
 //queue class implementations
 
@@ -188,13 +190,13 @@ Queue::~Queue()
 int Queue::enqueue(const char& item)
 {
   if(isFull())
-    {
-      return -1;
-    }
+  {
+    return -1;
+  }
   if(isEmpty())
-    {
-      front =0;
-    }
+  {
+    front =0;
+  }
   arr[++rear] = item;
   return 0;
 }
@@ -206,11 +208,15 @@ int Queue::dequeue(char& item)
       return -1;
     }
   item = arr[front];
-  if(front > rear)
-    {
-      front = rear = -1;
-    }
-  
+  //front>rear wasnt progressing front
+  if(front == rear)
+  {
+    front = rear = -1;
+  }
+  else
+  {
+    front++;
+  }
   return 0;
 }
 
@@ -234,98 +240,89 @@ int Queue::isFull()
 //fxn not in a class
 bool isOp(char c)
 {
-  return c == '+' || c == '-'|| c== '*'|| c == '/'|| c =='^';
-
+  return c == '+' || c == '-' || c == '*' || c == '/' || c == '^';
 }
 int getPrecedence(char c)
 {
-  if (c == '^')
+  if (c == '^') 
   {
     return 3;
-  }
-  else if (c == '*' || c == '/')
+  } else if (c == '*' || c == '/') 
   {
     return 2;
-  }else if (c == '+' || c == '-')
+  } else if (c == '+' || c == '-') 
   {
     return 1;
-  }else
+  } else 
   {
-    return -1;
-      }
+    return 0; // Non-operators have a neutral precedence of 0
+  }
 }
-void InfixtoPostfix(const char* in, char* post)
-{//convert infix expression to postfix expr.
-  Stack operatorStack;
-  int postfixIndex = 0;
-  for (int z = 0; z < strlen(in); z++) 
+void InfixtoPostfix(const char* in, char* post, Stack& s, Queue& q) //fixing funbction calls and operators
+{//convert infix expression to postfix expr. 
+int i = 0;
+  while (in[i] != '\0') 
   {
-    if (in[z] == ' ')
-     {
-      continue;
-     } 
-    if (isalnum(in[z])) 
+    char current = in[i];
+    if (isalnum(current)) 
+    { // Operand
+      q.enqueue(current);
+    } else if (current == '(') 
     {
-      post[postfixIndex++] = in[z];
-    } else if (in[z] == '(') 
-    {
-      operatorStack.push(in[z]);
-    } else if (in[z] == ')') 
+      s.push(current);
+    } else if (current == ')') 
     {
       char topOperator;
-      while (!operatorStack.isEmpty() && (operatorStack.peek(topOperator) != -1) && topOperator != '(') 
-      {//otherwise it would keep going
-        operatorStack.pop(topOperator);
-        post[postfixIndex++] = topOperator;
-      }
-      operatorStack.pop(topOperator); // Pop '('
-    } else 
-    {
-      char topOperator;
-      while (!operatorStack.isEmpty() && (operatorStack.peek(topOperator) != -1) 
-              && topOperator != '(' 
-              && getPrecedence(topOperator) >= getPrecedence(in[z])) 
+      while (s.peek(topOperator) == 0 && topOperator != '(') 
       {
-        operatorStack.pop(topOperator);
-        post[postfixIndex++] = topOperator;
+        q.enqueue(topOperator);
+        s.pop(topOperator);
       }
-      operatorStack.push(in[z]);
-    }
-    }
-
-    while (!operatorStack.isEmpty()) 
-    {
+      s.pop(topOperator); // Discard the '('
+    } else 
+    { // Operator
       char topOperator;
-      operatorStack.pop(topOperator);
-      post[postfixIndex++] = topOperator;
+      while (s.peek(topOperator) == 0 && getPrecedence(topOperator) >= getPrecedence(current)) 
+      {
+        q.enqueue(topOperator);
+        s.pop(topOperator);
+      }
+      s.push(current);
     }
-
-    post[postfixIndex] = '\0';
+    i++;
+  }
 }
-Node* createExpTree(const char* post)
+Node* createExpTree(Queue& q)
 {//create an expression tree from postfix expression
-  Stack treeStack;
-  for (int a = 0; a < strlen(post); a++) 
-  {
-    if (isalnum(post[a])) 
-    {
+  char item;
+  Node* treeStack[100];
+  int top = -1;
+
+  while (!q.isEmpty()) {
+    q.dequeue(item);
+    if (isalnum(item)) {
       Node* newNode = new Node;
-      newNode->data = post[a];
-      newNode->left = newNode->right = nullptr;
-      treeStack.push(post[a]);
-    } 
-    else 
-    {
-      char pChar;
-      treeStack.pop(pChar); // Pop operator
-      Node* newNode = new Node;
-      newNode->data = post[a];
-      newNode->right = reinterpret_cast<Node*>(treeStack.pop(pChar)); // Pop right operand
-      newNode->left = reinterpret_cast<Node*>(treeStack.pop(pChar)); // Pop left operand
-      treeStack.push(reinterpret_cast<char&>(*newNode)); // Push the new node
+      newNode->data = item;
+      newNode->left = nullptr; 
+      newNode->right = nullptr;
+      treeStack[++top] = newNode;
+    } else {
+      if (top >= 1) {
+        Node* rightOperand = treeStack[top--];
+        Node* leftOperand = treeStack[top--];
+        Node* newNode = new Node;
+        newNode->data = item;
+        newNode->right = rightOperand;
+        newNode->left = leftOperand;
+        treeStack[++top] = newNode;
+      } else {
+        cout << "Invalid postfix expression." << endl;
+        return nullptr;
+      }
     }
   }
-  return reinterpret_cast<Node*>(treeStack.pop()); // Pop and return the root node converting ptr type bc stack is char*
+
+  return treeStack[top];
 }
 void traverseInorder(Node* r)
 {
